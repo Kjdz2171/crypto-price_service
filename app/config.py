@@ -1,10 +1,13 @@
+"""Application configuration loaded from environment and .env."""
+
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    """Runtime settings. All fields can be overridden via env vars or .env."""
+
     app_name: str = "Crypto Price Service"
-    api_v1_prefix: str = "/api"
 
     db_host: str = Field("db", env="DB_HOST")
     db_port: int = Field(5432, env="DB_PORT")
@@ -25,8 +28,6 @@ class Settings(BaseSettings):
         "https://www.deribit.com/api/v2",
         env="DERIBIT_BASE_URL",
     )
-
-    # Tickers / indices we want to track on Deribit
     tracked_indices: tuple[str, ...] = ("btc_usd", "eth_usd")
 
     class Config:
@@ -42,7 +43,6 @@ class Settings(BaseSettings):
 
     @property
     def database_url_sync(self) -> str:
-        # Used by Alembic or synchronous tools if needed
         return (
             f"postgresql+psycopg2://{self.db_user}:{self.db_password}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
@@ -53,9 +53,8 @@ _settings: Settings | None = None
 
 
 def get_settings() -> Settings:
-    """Return application settings (cached per process). Avoids module-level global."""
+    """Return cached settings (one per process)."""
     global _settings
     if _settings is None:
         _settings = Settings()
     return _settings
-

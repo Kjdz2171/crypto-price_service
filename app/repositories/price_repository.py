@@ -1,16 +1,16 @@
-"""Repository for price persistence. Encapsulates data access (OOP, single responsibility)."""
+"""Data access for Price records (repository pattern)."""
 
 from collections.abc import Sequence
 from typing import Optional
 
-from sqlalchemy import Select, desc, select
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Price
 
 
 class PriceRepository:
-    """Handles all DB operations for Price records."""
+    """DB operations for the prices table."""
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -21,8 +21,8 @@ class PriceRepository:
         start_ts: Optional[int] = None,
         end_ts: Optional[int] = None,
     ) -> Sequence[Price]:
-        """Return prices for ticker, optionally filtered by timestamp range (ms)."""
-        stmt: Select = select(Price).where(Price.ticker == ticker)
+        """Return prices for ticker, optionally in [start_ts, end_ts] (UNIX ms)."""
+        stmt = select(Price).where(Price.ticker == ticker)
         if start_ts is not None:
             stmt = stmt.where(Price.timestamp >= start_ts)
         if end_ts is not None:
@@ -32,8 +32,8 @@ class PriceRepository:
         return result.scalars().all()
 
     async def find_latest_by_ticker(self, ticker: str) -> Optional[Price]:
-        """Return the most recent price for ticker, or None."""
-        stmt: Select = (
+        """Return the latest price for ticker, or None."""
+        stmt = (
             select(Price)
             .where(Price.ticker == ticker)
             .order_by(desc(Price.timestamp))
@@ -43,7 +43,7 @@ class PriceRepository:
         return result.scalars().first()
 
     async def add(self, ticker: str, price: float, timestamp: int) -> Price:
-        """Persist a new price record and return it."""
+        """Insert a price row and return it."""
         record = Price(ticker=ticker, price=price, timestamp=timestamp)
         self._session.add(record)
         await self._session.commit()

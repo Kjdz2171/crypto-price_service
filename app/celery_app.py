@@ -1,3 +1,5 @@
+"""Celery app and periodic task: fetch Deribit index prices every minute."""
+
 import asyncio
 from datetime import timedelta
 from typing import TYPE_CHECKING
@@ -18,7 +20,6 @@ celery_app = Celery(
     broker=_settings.celery_broker_url,
     backend=_settings.celery_result_backend,
 )
-
 celery_app.conf.beat_schedule = {
     "fetch-deribit-prices-every-minute": {
         "task": "app.celery_app.fetch_and_store_prices",
@@ -27,11 +28,11 @@ celery_app.conf.beat_schedule = {
 }
 celery_app.conf.timezone = "UTC"
 
-# Process-scoped session factory for the worker (no global business state).
 _worker_session_factory: "async_sessionmaker[AsyncSession] | None" = None
 
 
 def _get_worker_session_factory() -> "async_sessionmaker[AsyncSession]":
+    """Lazy-init session factory for the worker process (one per process)."""
     global _worker_session_factory
     if _worker_session_factory is None:
         _, _worker_session_factory = create_engine_and_session_factory(
@@ -41,6 +42,7 @@ def _get_worker_session_factory() -> "async_sessionmaker[AsyncSession]":
 
 
 async def _fetch_and_store() -> None:
+    """Fetch btc_usd and eth_usd index prices from Deribit and persist to DB."""
     settings = get_settings()
     indices = list(settings.tracked_indices)
     prices = await fetch_prices_for_indices(indices)
@@ -54,5 +56,5 @@ async def _fetch_and_store() -> None:
 
 @celery_app.task(name="app.celery_app.fetch_and_store_prices")
 def fetch_and_store_prices() -> None:
-    """Celery task: fetch Deribit index prices and store in DB."""
+    """Celery task entry: run async fetch-and-store in a new event loop."""
     asyncio.run(_fetch_and_store())
